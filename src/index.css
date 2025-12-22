@@ -1,0 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Geom:ital,wght@0,300..900;1,300..900&family=Mona+Sans:ital,wght@0,200..900;1,200..900&display=swap');
+
+@import "tailwindcss";
+
+body {
+    font-family: 'Mona Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
