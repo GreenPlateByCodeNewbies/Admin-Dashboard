@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getCollegeDomains } from '../../services/domainService';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -8,9 +9,26 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [allowedDomains, setAllowedDomains] = useState([]);
 
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // Load allowed domains on mount
+  useEffect(() => {
+    const loadDomains = async () => {
+      try {
+        const data = await getCollegeDomains();
+        setAllowedDomains(data.domains);
+        console.log('✅ Login page: Domains loaded:', data.domains);
+      } catch (err) {
+        console.error('❌ Login page: Failed to load domains:', err);
+        // Fallback to tint.edu.in if loading fails
+        setAllowedDomains(['tint.edu.in']);
+      }
+    };
+    loadDomains();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,12 +50,20 @@ const Login = () => {
       return;
     }
 
-    // Domain restriction - only allow @tint.edu.in
-    const allowedDomain = '@tint.edu.in';
-    if (!email.endsWith(allowedDomain)) {
-      setError(`Only ${allowedDomain} emails are allowed`);
-      setLoading(false);
-      return;
+    // Domain restriction - check against allowed domains from Firestore
+    if (allowedDomains.length > 0) {
+      const emailDomain = email.split('@')[1]?.toLowerCase();
+      const isAllowed = allowedDomains.some(domain => emailDomain === domain.toLowerCase());
+      
+      console.log('🔍 Login validation - Email domain:', emailDomain);
+      console.log('🔍 Login validation - Allowed domains:', allowedDomains);
+      console.log('🔍 Login validation - Is allowed?', isAllowed);
+      
+      if (!isAllowed) {
+        setError(`Only emails from ${allowedDomains.map(d => '@' + d).join(', ')} are allowed`);
+        setLoading(false);
+        return;
+      }
     }
 
     // Password length check
@@ -48,11 +74,14 @@ const Login = () => {
     }
 
     // Attempt login
+    console.log('🔵 Login page: Calling login function...');
     const result = await login(email, password);
 
     if (result.success) {
+      console.log('✅ Login page: Login successful, navigating to dashboard');
       navigate('/dashboard');
     } else {
+      console.log('❌ Login page: Login failed:', result.error);
       // Show user-friendly error messages
       let errorMessage = result.error;
       
@@ -62,8 +91,8 @@ const Login = () => {
         errorMessage = 'Incorrect password';
       } else if (errorMessage.includes('too-many-requests')) {
         errorMessage = 'Too many failed attempts. Please try again later';
-      } else if (errorMessage.includes('Not authorized')) {
-        errorMessage = 'Access denied: Admin privileges required';
+      } else if (errorMessage.includes('Not authorized') || errorMessage.includes('Access denied')) {
+        errorMessage = 'Access denied: Your email domain is not authorized';
       } else if (errorMessage.includes('network')) {
         errorMessage = 'Network error. Please check your connection';
       }
@@ -72,7 +101,7 @@ const Login = () => {
     }
     
     setLoading(false);
-  };
+  };``
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center p-4">

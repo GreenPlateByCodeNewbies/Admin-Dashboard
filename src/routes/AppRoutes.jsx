@@ -3,9 +3,7 @@ import Login from '../pages/Login/Login';
 import Dashboard from '../pages/Dashboard/Dashboard';
 import ProtectedRoute from './ProtectedRoute';
 import Stalls from '../pages/Stalls/Stalls';
-
-
-const Domains = () => <div className="p-8"><h1 className="text-3xl font-bold">Domains Page - Coming Soon</h1></div>;
+import Domains from '../pages/Domains/Domains';
 
 const AppRoutes = () => {
   return (
