@@ -100,7 +100,8 @@ const Stalls = () => {
       setShowDeleteModal(false);
       setStallToDelete(null);
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
+    } catch(err) {
+      console.error('Delete error:',err)
       setError('Failed to delete stall');
     } finally {
       setDeleting(false);
@@ -118,7 +119,8 @@ const Stalls = () => {
       setSuccess(`Stall ${stall.isVerified ? 'unverified' : 'verified'} successfully!`);
       await loadStalls();
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
+    } catch(err) {
+      console.error('Update error:',err)
       setError('Failed to update verification status');
     }
   };

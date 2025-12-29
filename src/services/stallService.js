@@ -8,7 +8,7 @@ import {
   query,
   orderBy,
   Timestamp,
-  getDoc
+  // getDoc
 } from 'firebase/firestore';
 import { db, auth } from '../app/firebase';
 

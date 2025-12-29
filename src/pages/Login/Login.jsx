@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getCollegeDomains } from '../../services/domainService';
+// import { getCollegeDomains } from '../../services/domainService';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -9,26 +9,9 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [allowedDomains, setAllowedDomains] = useState([]);
 
   const { login } = useAuth();
   const navigate = useNavigate();
-
-  // Load allowed domains on mount
-  useEffect(() => {
-    const loadDomains = async () => {
-      try {
-        const data = await getCollegeDomains();
-        setAllowedDomains(data.domains);
-        console.log('✅ Login page: Domains loaded:', data.domains);
-      } catch (err) {
-        console.error('❌ Login page: Failed to load domains:', err);
-        // Fallback to tint.edu.in if loading fails
-        setAllowedDomains(['tint.edu.in']);
-      }
-    };
-    loadDomains();
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
