@@ -1,8 +1,17 @@
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { addStall } from '../../services/stallService';
 import DashboardLayout from './DashboardLayout';
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
+
+  // Modal States
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const stats = [
     {
@@ -59,6 +68,32 @@ const Dashboard = () => {
     }
   ];
 
+  const handleAddStall = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!formData.name.trim() || !formData.email.trim()) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await addStall(formData);
+      setSuccess('Stall added successfully!');
+      setFormData({ name: '', email: '' });
+      setTimeout(() => {
+        setShowAddModal(false);
+        setSuccess('');
+      }, 2000);
+    } catch (err) {
+      setError(err.message || 'Failed to add stall');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -73,7 +108,6 @@ const Dashboard = () => {
               Your campus food system is performing <span className="text-emerald-600">optimally</span> today.
             </p>
           </div>
-          {/* Subtle Background Decoration */}
           <div className="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-emerald-50 rounded-full blur-3xl opacity-50"></div>
         </header>
 
@@ -104,17 +138,22 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Quick Actions - Takes up 1 column */}
+          {/* Quick Actions */}
           <div className="lg:col-span-1 space-y-6">
             <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-               Quick Actions
+                Quick Actions
             </h2>
             <div className="grid grid-cols-1 gap-4">
-              <button className="group flex items-center p-4 bg-white border border-gray-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50 transition-all shadow-sm">
-                <div className="bg-emerald-100 p-3 rounded-xl group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                   <svg className="w-6 h-6 text-emerald-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="group flex items-center p-4 bg-white border border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all shadow-sm"
+              >
+                <div className="bg-green-100 p-2 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
                 </div>
-                <span className="ml-4 font-bold text-gray-700">Add New Stall</span>
+                <span className="ml-3 font-semibold text-gray-700 font-heading">Add New Stall</span>
               </button>
 
               <button className="group flex items-center p-4 bg-white border border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all shadow-sm">
@@ -133,7 +172,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Recent Activity - Takes up 2 columns */}
+          {/* Recent Activity */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-50 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-800">Recent Activity</h2>
@@ -176,6 +215,64 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Stall Modal Overlay */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4 font-heading">Add New Stall</h2>
+            
+            {success ? (
+              <div className="bg-green-50 text-green-700 p-4 rounded-lg mb-4 font-heading text-center font-semibold">
+                {success}
+              </div>
+            ) : (
+              <form onSubmit={handleAddStall} className="space-y-4">
+                {error && <p className="text-red-500 text-sm font-heading">{error}</p>}
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 font-heading">Stall Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                    placeholder="e.g. South Canteen"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2 font-heading">Owner Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                    placeholder="stall@college.edu.in"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    type="button" 
+                    onClick={() => { setShowAddModal(false); setError(''); }}
+                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors font-heading"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={submitting}
+                    className="flex-1 px-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-all shadow-md disabled:opacity-50 font-heading"
+                  >
+                    {submitting ? 'Adding...' : 'Add Stall'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

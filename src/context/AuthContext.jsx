@@ -5,7 +5,6 @@ import {
   onAuthStateChanged 
 } from 'firebase/auth';
 import { auth } from '../app/firebase';
-import { getCollegeDomains } from '../services/domainService';
 
 const AuthContext = createContext();
 
@@ -23,6 +22,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Helper to verify if the email belongs to the required educational domain
+  const isValidEduDomain = (email) => {
+    return email?.toLowerCase().endsWith('.edu.in');
+  };
+
   // Login function
   const login = async (email, password) => {
     try {
@@ -32,49 +36,34 @@ export const AuthProvider = ({ children }) => {
       console.log('🔵 Login attempt for:', email);
 
       // Step 1: Sign in with Firebase
+      // If the user is in your Firebase Auth DB, this succeeds.
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
       console.log('✅ Firebase auth successful');
 
-      // Step 2: Get Firebase ID token
-      const token = await user.getIdToken();
+      // Step 2: Suffix Verification 
+      // Mandatory check to ensure the logged-in user has a .edu.in address
+      if (!isValidEduDomain(user.email)) {
+        console.log('❌ Access denied: Non-.edu.in domain');
+        await signOut(auth);
+        throw new Error('Access denied: Only .edu.in email addresses are authorized');
+      }
 
-      // Step 3: Verify admin role with backend
-      // 🔧 MOCK MODE - Remove this when backend is ready
-      const MOCK_MODE = true; // Set to false when FastAPI is ready
+      // Step 3: Admin Verification
+      const token = await user.getIdToken();
+      
+      // 🔧 MOCK MODE 
+      const MOCK_MODE = true; 
       
       if (MOCK_MODE) {
-        console.log('🔵 Mock mode: Checking domain...');
+        console.log('✅ User verified via Firebase DB and Domain suffix');
         
-        // Mock admin verification - check domain from Firestore
-        try {
-          const { domains } = await getCollegeDomains();
-          const emailDomain = email.split('@')[1]?.toLowerCase();
-          const isAllowed = domains.some(d => d.toLowerCase() === emailDomain);
-          
-          console.log('🔍 Email domain:', emailDomain);
-          console.log('🔍 Allowed domains:', domains);
-          console.log('🔍 Is allowed?', isAllowed);
-          
-          if (!isAllowed) {
-            await signOut(auth);
-            throw new Error('Access denied: Your email domain is not authorized');
-          }
-          
-          console.log('✅ Domain check passed');
-          
-          // Mock: Assume user is admin if domain matches
-          setIsAdmin(true);
-          setCurrentUser(user);
-          localStorage.setItem('adminToken', token);
-          
-          return { success: true };
-        } catch (domainError) {
-          console.error('❌ Domain check failed:', domainError);
-          await signOut(auth);
-          throw domainError;
-        }
+        setIsAdmin(true);
+        setCurrentUser(user);
+        localStorage.setItem('adminToken', token);
+        
+        return { success: true };
       }
       
       // Real backend verification (use when FastAPI is ready)
@@ -86,25 +75,19 @@ export const AuthProvider = ({ children }) => {
         }
       });
 
-      if (!response.ok) {
-        throw new Error('Not authorized as admin');
-      }
-
+      if (!response.ok) throw new Error('Not authorized as admin');
       const data = await response.json();
       
       if (!data.is_admin) {
-        // If not admin, sign them out immediately
         await signOut(auth);
         throw new Error('Access denied: Admin privileges required');
       }
 
       setIsAdmin(true);
       setCurrentUser(user);
-      
-      // Store token for API calls
       localStorage.setItem('adminToken', token);
-
       return { success: true };
+
     } catch (err) {
       console.error('❌ Login error:', err);
       setIsAdmin(false);
@@ -119,7 +102,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout function
   const logout = async () => {
     try {
       await signOut(auth);
@@ -133,77 +115,26 @@ export const AuthProvider = ({ children }) => {
 
   // Listen to auth state changes
   useEffect(() => {
-    console.log('🔵 Setting up auth state listener...');
-    
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('🔵 Auth state changed. User:', user?.email || 'None');
-      
       if (user) {
-        // User is signed in, verify admin status
         try {
-          const token = await user.getIdToken();
-          
-          // 🔧 MOCK MODE - Remove this when backend is ready
-          const MOCK_MODE = true; // Set to false when FastAPI is ready
-          
-          if (MOCK_MODE) {
-            console.log('🔵 Mock mode: Verifying on refresh...');
-            
-            // Mock: Check if email domain is allowed
-            try {
-              const { domains } = await getCollegeDomains();
-              const emailDomain = user.email.split('@')[1]?.toLowerCase();
-              const isAllowed = domains.some(d => d.toLowerCase() === emailDomain);
-              
-              console.log('🔍 Refresh check - Email domain:', emailDomain);
-              console.log('🔍 Refresh check - Allowed domains:', domains);
-              console.log('🔍 Refresh check - Is allowed?', isAllowed);
-              
-              if (isAllowed) {
-                console.log('✅ Domain valid - setting as admin');
-                setIsAdmin(true);
-                setCurrentUser(user);
-                localStorage.setItem('adminToken', token);
-              } else {
-                console.log('❌ Domain invalid - signing out');
-                setIsAdmin(false);
-                setCurrentUser(null);
-                localStorage.removeItem('adminToken');
-                await signOut(auth);
-              }
-            } catch (domainError) {
-              console.error('❌ Domain check error on refresh:', domainError);
-              setIsAdmin(false);
-              setCurrentUser(null);
-              localStorage.removeItem('adminToken');
-            }
+          // Verify domain suffix on refresh to maintain security
+          if (isValidEduDomain(user.email)) {
+            const token = await user.getIdToken();
+            console.log('✅ Auth refresh: User verified');
+            setIsAdmin(true);
+            setCurrentUser(user);
+            localStorage.setItem('adminToken', token);
           } else {
-            // Real backend verification (use when FastAPI is ready)
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/admin/verify`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              setIsAdmin(data.is_admin);
-              setCurrentUser(user);
-              localStorage.setItem('adminToken', token);
-            } else {
-              setIsAdmin(false);
-              setCurrentUser(null);
-              localStorage.removeItem('adminToken');
-            }
+            console.log('❌ Auth refresh: Invalid domain, signing out');
+            await signOut(auth);
           }
         } catch (err) {
-          console.error('❌ Admin verification error:', err);
+          console.error('❌ Verification error on refresh:', err);
           setIsAdmin(false);
           setCurrentUser(null);
         }
       } else {
-        console.log('🔵 No user signed in');
         setCurrentUser(null);
         setIsAdmin(false);
         localStorage.removeItem('adminToken');
@@ -214,14 +145,7 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const value = {
-    currentUser,
-    isAdmin,
-    loading,
-    error,
-    login,
-    logout
-  };
+  const value = { currentUser, isAdmin, loading, error, login, logout };
 
   return (
     <AuthContext.Provider value={value}>

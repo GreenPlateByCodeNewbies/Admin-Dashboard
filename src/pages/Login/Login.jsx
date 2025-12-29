@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getCollegeDomains } from '../../services/domainService';
+// import { getCollegeDomains } from '../../services/domainService';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -9,26 +9,9 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [allowedDomains, setAllowedDomains] = useState([]);
 
   const { login } = useAuth();
   const navigate = useNavigate();
-
-  // Load allowed domains on mount
-  useEffect(() => {
-    const loadDomains = async () => {
-      try {
-        const data = await getCollegeDomains();
-        setAllowedDomains(data.domains);
-        console.log('✅ Login page: Domains loaded:', data.domains);
-      } catch (err) {
-        console.error('❌ Login page: Failed to load domains:', err);
-        // Fallback to tint.edu.in if loading fails
-        setAllowedDomains(['tint.edu.in']);
-      }
-    };
-    loadDomains();
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,51 +33,33 @@ const Login = () => {
       return;
     }
 
-    // Domain restriction - check against allowed domains from Firestore
-    if (allowedDomains.length > 0) {
-      const emailDomain = email.split('@')[1]?.toLowerCase();
-      const isAllowed = allowedDomains.some(domain => emailDomain === domain.toLowerCase());
-      
-      console.log('🔍 Login validation - Email domain:', emailDomain);
-      console.log('🔍 Login validation - Allowed domains:', allowedDomains);
-      console.log('🔍 Login validation - Is allowed?', isAllowed);
-      
-      if (!isAllowed) {
-        setError(`Only emails from ${allowedDomains.map(d => '@' + d).join(', ')} are allowed`);
-        setLoading(false);
-        return;
-      }
+    //Mandatory .edu.in domain check
+    if(!email.toLowerCase().endsWith('.edu.in')){
+      setError('Access restricted: Only .edu.in email address are permitted')
+      setLoading(false)
+      return
     }
 
-    // Password length check
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      setLoading(false);
-      return;
-    }
-
-    // Attempt login
-    console.log('🔵 Login page: Calling login function...');
-    const result = await login(email, password);
-
-    if (result.success) {
-      console.log('✅ Login page: Login successful, navigating to dashboard');
+    //Attempt Login
+    console.log('🔵 Login page: Verifying credentials in Firebase Auth...')
+    const result = await login(email,password)
+   if (result.success) {
+      console.log('✅ Login page: Admin verified, navigating to dashboard');
       navigate('/dashboard');
     } else {
-      console.log('❌ Login page: Login failed:', result.error);
-      // Show user-friendly error messages
+      console.log('❌ Login page: Authentication failed:', result.error);
+      
       let errorMessage = result.error;
       
+      // Handle Firebase specific error codes
       if (errorMessage.includes('user-not-found')) {
-        errorMessage = 'No account found with this email';
+        errorMessage = 'No registered admin account found with this email';
       } else if (errorMessage.includes('wrong-password')) {
         errorMessage = 'Incorrect password';
       } else if (errorMessage.includes('too-many-requests')) {
         errorMessage = 'Too many failed attempts. Please try again later';
-      } else if (errorMessage.includes('Not authorized') || errorMessage.includes('Access denied')) {
-        errorMessage = 'Access denied: Your email domain is not authorized';
-      } else if (errorMessage.includes('network')) {
-        errorMessage = 'Network error. Please check your connection';
+      } else {
+        errorMessage = 'Authentication failed. Please check your credentials';
       }
       
       setError(errorMessage);
