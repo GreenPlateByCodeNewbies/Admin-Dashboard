@@ -12,6 +12,8 @@ const Stalls = () => {
   const [stalls, setStalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [stallToDelete, setStallToDelete] = useState(null);
   const [editingStall, setEditingStall] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -19,7 +21,8 @@ const Stalls = () => {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [submitting, setSubmitting] = useState(false); // New: track form submission
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadStalls();
@@ -56,7 +59,6 @@ const Stalls = () => {
 
     try {
       setSubmitting(true);
-
       if (editingStall) {
         await updateStall(editingStall.id, formData);
         setSuccess('Stall updated successfully!');
@@ -68,40 +70,46 @@ const Stalls = () => {
       setFormData({ name: '', email: '' });
       setShowModal(false);
       setEditingStall(null);
-
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.message || 'Operation failed');
-      console.error(err);
     } finally {
-      setSubmitting(false); 
+      setSubmitting(false);
     }
   };
 
   const handleEdit = (stall) => {
     setEditingStall(stall);
-    setFormData({
-      name: stall.name,
-      email: stall.email,
-    });
+    setFormData({ name: stall.name, email: stall.email });
     setShowModal(true);
     setError('');
   };
 
-  const handleDelete = async (stallId) => {
-    if (!window.confirm('Are you sure you want to delete this stall?')) {
-      return;
-    }
+  const handleDelete = (stallId) => {
+    setStallToDelete(stallId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!stallToDelete) return;
     try {
-      await deleteStall(stallId);
+      setDeleting(true);
+      await deleteStall(stallToDelete);
       setSuccess('Stall deleted successfully!');
       await loadStalls();
+      setShowDeleteModal(false);
+      setStallToDelete(null);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError('Failed to delete stall');
-      console.error(err);
+    } finally {
+      setDeleting(false);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setStallToDelete(null);
   };
 
   const handleToggleVerification = async (stall) => {
@@ -112,7 +120,6 @@ const Stalls = () => {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError('Failed to update verification status');
-      console.error(err);
     }
   };
 
@@ -143,7 +150,7 @@ const Stalls = () => {
           </button>
         </div>
 
-        {/* Success/Error Messages */}
+        {/* Alerts */}
         {success && (
           <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg animate-shake">
             <div className="flex items-center">
@@ -188,10 +195,7 @@ const Stalls = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {stalls.map((stall) => (
-              <div
-                key={stall.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
-              >
+              <div key={stall.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-gray-800 mb-1">{stall.name}</h3>
@@ -199,34 +203,18 @@ const Stalls = () => {
                   </div>
                   <button
                     onClick={() => handleToggleVerification(stall)}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      stall.isVerified
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    } transition-colors`}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold ${stall.isVerified ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} transition-colors`}
                   >
                     {stall.isVerified ? '✓ Verified' : 'Unverified'}
                   </button>
                 </div>
-
                 <div className="text-xs text-gray-500 mb-4">
                   <p>Created: {new Date(stall.createdAt).toLocaleDateString()}</p>
                   <p>By: {stall.createdBy}</p>
                 </div>
-
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(stall)}
-                    className="flex-1 px-4 py-2 bg-blue-50 text-blue-600 font-medium rounded-lg hover:bg-blue-100 transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(stall.id)}
-                    className="flex-1 px-4 py-2 bg-red-50 text-red-600 font-medium rounded-lg hover:bg-red-100 transition-colors"
-                  >
-                    Delete
-                  </button>
+                  <button onClick={() => handleEdit(stall)} className="flex-1 px-4 py-2 bg-blue-50 text-blue-600 font-medium rounded-lg hover:bg-blue-100 transition-colors">Edit</button>
+                  <button onClick={() => handleDelete(stall.id)} className="flex-1 px-4 py-2 bg-red-50 text-red-600 font-medium rounded-lg hover:bg-red-100 transition-colors">Delete</button>
                 </div>
               </div>
             ))}
@@ -236,76 +224,117 @@ const Stalls = () => {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                {editingStall ? 'Edit Stall' : 'Add New Stall'}
-              </h2>
-
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">{editingStall ? 'Edit Stall' : 'Add New Stall'}</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Stall Name
-                  </label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Stall Name</label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                     placeholder="North Canteen"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Stall Email
-                  </label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Stall Email</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                     placeholder="stall@example.com"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    This email will be used for stall owner login
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">This email will be used for stall owner login</p>
                 </div>
-
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                      setEditingStall(null);
-                      setFormData({ name: '', email: '' });
-                      setError('');
-                    }}
+                    onClick={() => { setShowModal(false); setEditingStall(null); setFormData({ name: '', email: '' }); setError(''); }}
                     disabled={submitting}
-                    className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center"
                   >
                     {submitting ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        {editingStall ? 'Updating...' : 'Adding...'}
-                      </>
-                    ) : (
-                      <>{editingStall ? 'Update' : 'Add'} Stall</>
-                    )}
+                      <><div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2" />{editingStall ? 'Updating...' : 'Adding...'}</>
+                    ) : (<>{editingStall ? 'Update' : 'Add'} Stall</>)}
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-shake">
+            <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Delete Stall</h3>
+                  <p className="text-red-100 text-sm">This action cannot be undone</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <p className="text-gray-700 mb-2">Are you sure you want to delete this stall?</p>
+              <p className="text-sm text-gray-500 mb-4">All associated data will be permanently removed from the system.</p>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start">
+                  <svg className="w-5 h-5 text-red-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-red-800">Warning</p>
+                    <p className="text-xs text-red-700 mt-1">This stall will be permanently deleted and cannot be recovered.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={cancelDelete} disabled={deleting} className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50">Cancel</button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="group flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all flex items-center justify-center disabled:opacity-50"
+                >
+                  {deleting ? (
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <>
+                      <div className="relative w-5 h-5 mr-2">
+                        {/* Animated Lid */}
+                        <svg className="absolute inset-0 transition-transform duration-300 group-hover:-translate-y-1.5 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
+                        </svg>
+                        {/* Static Bin */}
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6" />
+                        </svg>
+                      </div>
+                      <span>Yes, Delete</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
