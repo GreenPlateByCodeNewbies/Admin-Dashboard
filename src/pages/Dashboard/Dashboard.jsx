@@ -8,7 +8,6 @@ import { db } from '../../app/firebase';
 const Dashboard = () => {
   const { currentUser } = useAuth();
 
-  // Modal States
   const [stallCount,setStallCount] = useState(0)
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '' });
