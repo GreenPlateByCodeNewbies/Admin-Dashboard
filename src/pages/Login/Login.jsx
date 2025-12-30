@@ -72,12 +72,12 @@ const Login = () => {
         <div className="w-full max-w-md space-y-8">
           {/* Logo & Header */}
           <div className="space-y-3">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-50 overflow-hidden">
+            <div className="flex items-center gap-1 mb-8">
+              <div className="flex items-center justify-center w-15 h-10 overflow-hidden">
                 <img 
                   src="/GreenPlate.png" 
                   alt="GreenPlate Logo" 
-                  className="w-10 h-10 object-contain"
+                  className="w-30 h-30 object-contain"
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.parentElement.innerHTML = '<span class="text-2xl">🍽️</span>';
